@@ -28,7 +28,7 @@
    "provides" : {
       "App::Prima::REPL" : {
          "file" : "lib/App/Prima/REPL.pm",
-         "version" : "0.01"
+         "version" : "0.02"
       },
       "PrimaX::InputHistory" : {
          "file" : "lib/PrimaX/InputHistory.pm",
@@ -53,5 +53,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.01"
+   "version" : "0.02"
 }

@@ -15,7 +15,7 @@ name: App-Prima-REPL
 provides:
   App::Prima::REPL:
     file: lib/App/Prima/REPL.pm
-    version: 0.01
+    version: 0.02
   PrimaX::InputHistory:
     file: lib/PrimaX/InputHistory.pm
     version: 0
@@ -32,4 +32,4 @@ requires:
   Prima: 1.33
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.01
+version: 0.02
