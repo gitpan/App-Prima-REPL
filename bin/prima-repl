@@ -41,14 +41,14 @@ BEGIN {
 }
 
 my $app_filename = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
-my $version = 0.1;
-
+my $version = 0.3;
 
 #########################
 # Main Application Code #
 #########################
 
 package REPL;
+my $history_output_handler = PrimaX::InputHistory::Output::REPL->new;
 
 our @text_file_extension_list = (
 		  ['Perl scripts'		=> '*.pl'	]
@@ -91,6 +91,8 @@ our $window = Prima::MainWindow->new(
 			wordWrap => 1,
 			readOnly => 1,
 			backColor => cl::LightGray,
+			font => { name => 'courier new'},
+
 		);
 		# Over-ride the defaults for these:
 		$output->accelTable->insert([
@@ -104,6 +106,7 @@ our $window = Prima::MainWindow->new(
 		text => '',
 		pack => {fill => 'both', after => $notebook, padx => $padding, pady => $padding},
 		storeType => ih::NoRepeat,
+		outputWidget => $history_output_handler,
 		onCreate => sub {
 			my $self = shift;
 			
@@ -275,6 +278,67 @@ sub change_default_widget {
 	$default_widget_for[$index] = $widget;
 }
 
+################################################################################
+# Usage      : REPL::get_default_widget($index)
+# Purpose    : retrieves the default widget for the tab with the given index
+# Returns    : the default widget
+# Parameters : the tab's index (returned in list context from create_new_tab)
+# Throws     : never
+# Comments   : use this to modify the default widget's properties, if needed
+################################################################################
+sub get_default_widget {
+	my ($index) = @_;
+	return $default_widget_for[$index];
+}
+
+################################################################################
+# Usage      : REPL::endow_editor_widget($widget)
+# Purpose    : Sets the properties of an edit widget so it behaves like a
+#            : multiline buffer.
+# Returns    : nothing
+# Parameters : the widget to endow
+# Throws     : when you supply an object not derived from Prima::Edit
+# Comments   : none
+################################################################################
+sub endow_editor_widget {
+	my $widget = shift;
+	
+	# Verify the object
+	croak("endow_editor_widget expects a Prima::Edit widget")
+		unless eval{$widget->isa("Prima::Edit")};
+	
+	# Allow for insertions, deletions, newlines, etc
+	$widget->set(
+		tabIndent => 4,
+		syntaxHilite => 1,
+		wantTabs => 1,
+		wantReturns => 1,
+		wordWrap => 0,
+		autoIndent => 1,
+		cursorWrap => 1,
+		font => { pitch => fp::Fixed, style => fs::Bold, name => 'courier new'},
+	);
+
+	# Update the accelerators.
+	my $accTable = $widget->accelTable;
+
+	# Add some functions to the accelerator table
+	$accTable->insert([
+		# Ctrl-Enter runs the file
+		  ['CtrlReturn', '', kb::Return 	| km::Ctrl,  sub{main::run_file()}				]
+		, ['CtrlEnter', '', kb::Enter  	| km::Ctrl,  sub{main::run_file()}				]
+		# Ctrl-Shift-Enter runs the file and selects the output window
+		, ['CtrlShiftReturn', '', kb::Return 	| km::Ctrl | km::Shift,	\&main::run_file_with_output	]
+		, ['CtrlShiftEnter', '', kb::Enter  	| km::Ctrl | km::Shift,	\&main::run_file_with_output	]
+		# Ctrl-PageUp/PageDown don't work by default, so add them, too:
+		, ['CtrlPageUp', '', kb::PageUp 	| km::Ctrl,  \&REPL::goto_prev_page				]
+		, ['CtrlPageDown', '', kb::PageDown | km::Ctrl,  \&REPL::goto_next_page				]
+		]
+		, ''
+		, 0
+	);
+}
+
 # closes the tab number, or name if provided, or current if none is supplied
 # ENCOUNTERIMG TROUBLE WITH THIS, working here
 sub close_tab {
@@ -289,7 +353,8 @@ sub close_tab {
 			if $to_close == 0;
 		
 		# Close the tab
-		CORE::warn "Internal: Not checking if the file needs to be saved.";
+		CORE::warn "Internal: Not checking if the file needs to be saved."
+			if eval{$default_widget_for[$to_close]->isa('Prima::Edit')};
 		splice @tabs, $to_close, 1;
 		splice @default_widget_for, $to_close, 1;
 		$notebook->Notebook->delete_page($to_close);
@@ -300,7 +365,8 @@ sub close_tab {
 		$to_close = qr/$to_close/ unless ref($to_close) eq 'Regex';
 		while ($i < @tabs) {
 			if ($tabs[$i] eq $to_close) {
-				CORE::warn "Internal: Not checking if the file needs to be saved.";
+				CORE::warn "Internal: Not checking if the file needs to be saved."
+					if eval{$default_widget_for[$to_close]->isa('Prima::Edit')};
 				$notebook->Notebook->delete_page($_);
 				splice @default_widget_for, $i, 1;
 				splice @tabs, $i, 1;
@@ -565,31 +631,8 @@ sub new_file {
 	my ($page_widget, $index) = REPL::create_new_tab('New File', Edit =>
 		text => '',
 		pack => { fill => 'both', expand => 1, padx => $padding, pady => $padding },
-		# Allow for insertions, deletions, and newlines:
-		tabIndent => 1,
-		syntaxHilite => 1,
-		wantTabs => 1,
-		wantReturns => 1,
-		wordWrap => 0,
-		autoIndent => 1,
-		cursorWrap => 1,
 	);
-
-	# Update the accelerators.
-	my $accTable = $page_widget->accelTable;
-
-	# Add some functions to the accelerator table
-	$accTable->insert([
-		# Ctrl-Enter runs the file
-		  ['', '', kb::Return 	| km::Ctrl,  sub{run_file()}				]
-		, ['', '', kb::Enter  	| km::Ctrl,  sub{run_file()}				]
-		# Ctrl-Shift-Enter runs the file and selects the output window
-		, ['', '', kb::Return 	| km::Ctrl | km::Shift,	\&run_file_with_output	]
-		, ['', '', kb::Enter  	| km::Ctrl | km::Shift,	\&run_file_with_output	]
-		# Ctrl-PageUp/PageDown don't work by default, so add them, too:
-		, ['', '', kb::PageUp 	| km::Ctrl,  \&REPL::goto_prev_page				]
-		, ['', '', kb::PageDown | km::Ctrl,  \&REPL::goto_next_page				]
-		], '', 0);
+	REPL::endow_editor_widget($page_widget);
 
 	# Update the default widget for this page:
 	REPL::change_default_widget($index, $page_widget);
@@ -651,7 +694,7 @@ sub open_file {
 	(undef,undef,my $name) = File::Spec->splitpath( $file );
 	# working here - make this smarter so it calls new_file for anything that's
 	# not an edit buffer.
-	if ($page == 0) {
+	if ($page == 0 or not eval{$default_widget_for[$notebook->pageIndex]->isa('Prima::Edit')}) {
 		new_file($name);
 	}
 	else {
@@ -721,11 +764,11 @@ sub run_file {
 
 	# If error, switch to the console and print it to the output:
 	if ($@) {
+		my $message = $@;
 		my $tabs = $notebook->tabs;
 		my $header = "----- Error running ". $tabs->[$page]. " -----";
-		REPL::warn($header);
-		REPL::warn($@);
-		REPL::warn('-' x length $header);
+		$message = "$header\n$message\n" . ('-' x length $header);
+		REPL::warn($message);
 		$@ = '';
 	}
 }
@@ -876,7 +919,7 @@ sub PRINT {
 sub PRINTF {
 	my $self = shift;
 	my $to_print = sprintf(@_);
-	main::outwindow($self->to_stderr(), @_);
+	REPL::outwindow($self->to_stderr(), @_);
 }
 # This function provides access to the original stdout file handle
 sub print_to_terminal {
@@ -902,6 +945,28 @@ tie *ERROUT, 'IO::OutWindow::Err';
 # Tie stderr to the new tied file handle
 *main::STDERR = \*ERROUT;
 
+######################################
+# A custom inputHistory Output class #
+######################################
+
+package PrimaX::InputHistory::Output::REPL;
+# Thanks to the tied output, I can simply "print" results and they will
+# go to the output widget
+sub printout {
+	my $self = shift;
+	print @_;
+}
+sub newline_printout {
+	my $self = shift;
+	print "\n" if $output_column != 0;
+	print @_;
+}
+sub new { return bless {} }
+
+###############
+# Final items #
+###############
+
 package main;
 
 eval 'require PDL::Version' if not defined $PDL::Version::VERSION;
@@ -919,12 +984,14 @@ print join(' ', "If you don't know what you're doing, you can get help by"
 # Run any initialization script #
 #################################
 sub redo_initrc {
-	if (-f $initrc_filename) {
+	my $filename = $initrc_filename if -f $initrc_filename;
+	$filename = "$initrc_filename.pl" if -f "$initrc_filename.pl";
+	if ($filename) {
 		print "Running initialization script\n";
 		# Load the init script and send it to 
-		open my $fh, '<', $initrc_filename;
+		open my $fh, '<', $filename;
 		my $text = do { local( $/ ) ; <$fh> };
-		my_eval($text);
+		my_eval("#line 1 \"$filename\"\n$text");
 		REPL::warn("Errors encountered running the initialization script:\n$@\n")
 			if $@;
 		$@ = '';
@@ -933,7 +1000,7 @@ sub redo_initrc {
 		print "No initialization script found\n";
 	}
 }
-redo_initrc if -f $initrc_filename;
+redo_initrc if -f $initrc_filename or -f "$initrc_filename.pl";
 
 run Prima;
 # Remove the logfile. This will not happen with a system failure, which means
@@ -954,8 +1021,8 @@ command input. The main window is a set of tabs, the first of which is an output
 tab. Additional tabs can contain files or any other extension that has been
 written as a App::Prima::REPL tab.
 
-If your project has project-specific notes, you should be able to find them here:
-L<prima-repl.initrc>.
+If your project has project-specific notes, you should be able to find them
+either here: L<prima-repl.initrc> or here: L<prima-repl.initrc.pl>.
 
 =head1 Fixing Documentation Fonts
 
@@ -1049,7 +1116,7 @@ C<hist> function and typing
 
 will load the pod from PDL::Ufunc into the pod viewer.
 
-If you are looking for help on Perl, Prima, or PDL, check out L<perlintro>,
+If you need help on Perl, Prima, or PDL, check out L<perlintro>,
 L<Prima::tutorial>, or L<PDL::QuickStart>, respectively.
 
 One caveat to the C<help> command: if the pod viewer's current page has a
@@ -1169,8 +1236,8 @@ differently.)
  
  # Create the plotter widget:
  $plotter = plot(
-     -function => [\&PDL::exp, color => cl::Blue],
-     -data => [$t_data, $y_data, color => cl::Red],
+     -function => ds::Func(\&PDL::exp, color => cl::Blue),
+     -data => ds::Pair($t_data, $y_data, color => cl::Red),
      y => {
          scaling => sc::Log,
          label => 'exp(t)',
@@ -1183,7 +1250,16 @@ This multiline buffer saves the reference to the plotting widget, allowing you
 to fiddle with it from the input line if you like. For example, you can add
 the hyperbolic cosine function like so:
 
- $plotter->dataSets->{cosh} = [\&PDL::cosh, colors => cl::Green];
+ $plotter->dataSets->{cosh} = ds::Func(\&PDL::cosh, colors => cl::Green);
+
+=head2 PDL::NiceSlice
+
+You can use L<PDL::NiceSlice> in your code. It is not terribly intelligent
+method at the moment. If the evaluator finds the exact string
+C<use PDL::NiceSlice>, it uses the PDL::NiceSlice preprocessor to replace
+PDL slices with calls to mslice, just like the real source filter.
+Unfortunately, this does not look for statements like C<no PDL::NiceSlice>,
+which can be problematic.
 
 =head1 Customizing
 
@@ -1193,10 +1269,10 @@ per-project rc files and pod notes, custom tabs, and custom commands.
 =head2 RC File and Notes
 
 App::Prima::REPL supports per-directory rc files and input logs. When you
-have a file called
-F<prima-repl.initrc> in the directory from which you execute C<prima-repl>,
-it will be executed upon startup. The purpose of this rc file is to allow for
-per-project initialization and function definitions.
+have a file called F<prima-repl.initrc> or F<prima-repl.initrc.pl> in the
+directory from which you execute C<prima-repl>, it will be executed upon 
+startup (with a preference for the former). The purpose of this rc file is
+to allow for per-project initialization and function definitions.
 
 You can emulate user input with the C<REPL::simulate_run> command, which will add text
 to the input line and then use the standard input lne mechanism to evaluate the
@@ -1205,7 +1281,7 @@ history. However, as this adds lines to the history file, you should use this
 sparingly, only when you think the user will want to retrieve the command in
 their history.
 
-A very useful apect of F<prima-repl.initrc> file is that you can add documentation by
+A very useful apect of initrc file is that you can add documentation by
 simply inserting pod in your initrc file. The link at the top of this help file
 will automatically open the documentation or give a message indicating that
 there is no such documentation. This way, if you declare any useful functions
@@ -1240,13 +1316,45 @@ if you want C<CTRL-i> to toggle between the desired widget and the input
 line, which is the behavior of the file buffers, you will need to have your
 default widge properly respond to C<CTRL-i> keyboard input.
 
+=item REPL::endow_editor_widget($widget)
+
+Given a normal editor widget, this sets the various options to make the editor
+behave like the default multiline buffer editor. For example, it turns on
+syntax highlighting, sets a monospace font, and sets the default accelerator
+keys. Although not strictly necessary for creating tabs, it may be useful if
+you want to create a tab with both an editor and some other sort of widget,
+side-by-side, as is done in L<App::Prima::REPL::Talk>.
+
+This function does not set the widget as the tab's default widget, since you
+may want the default widget to be something else. You should explicitly invoke
+C<REPL::change_default_widget> (above) to do that.
+
+The endowed editor has named key bindings that you can overwrite:
+
+ CtrlReturn    CtrlShiftReturn
+ CtrlEnter     CtrlShiftEnter
+ CtrlPageDown  CtrlPageUp
+
+You can override these commands with something like this:
+
+ # Update ctrl-return/ctrl-edit for the editor
+ $editor->accelTable->insert([
+       # Ctrl-Enter runs the file
+       ['CtrlReturn', '', kb::Return  | km::Ctrl, $run_code ]
+     , ['CtrlEnter', '', kb::Enter    | km::Ctrl, $run_code ]
+   ]
+   , ''
+   , 0
+ );
+
 =back
 
 At some point I'll add an example of how to use these.
 
 =head2 Custom Commands
 
-Perl knows about functions. App::Prima::REPL also knows about commands, like
+Perl knows about I<functions> and I<list operators>. App::Prima::REPL
+I<also> knows about I<commands>, like
 the C<help> command. Remember, the help command doesn't require quotes around
 the module name. How do I do this? I achieve this by hooking into the
 C<PressEnter> stage of the InputHistory widget. Hooking into this stage of
@@ -1266,13 +1374,13 @@ Here's the hook that proceses the help command:
 
 Notice that the help command does not want the eventual string to be
 evaluated, so it calls C<get_help> and then clears the event. If you simply
-want to modify the string before it gets evaluated, feel free to modify
+want to modify the string before it gets evaluated, you need to modify
 C<$_[1]> directly without clearing the event.
 
 The subroutine that you write for such hooks will be passed two arguments,
 the InputHistory object (C<$REPL::inline>) and the text from the input line's
-buffer. Note that by the time your notification receives the text, it may
-have already been modified as there are a number of notifications built-in.
+buffer. Note that by the time your notification receives the latter, it may
+have already been modified as there are a number of built-in notifications.
 
 =head2 Other API Functions
 
@@ -1283,7 +1391,7 @@ Here are some other REPL API functions that you may find useful:
 =item REPL::goto_output
 
 Simply switches the focus to the output tab, which is useful when you want
-to print a number of things out and have you user notice.
+to print a number of things out and have your user notice.
 
 =item REPL::warn (LIST)
 
@@ -1303,6 +1411,9 @@ with failure messages. Compare:
 vs
 
  return REPL::warn("Problems!\n") if $messed_up;
+
+Indeed, this one-line idiom (C<return REPL::warn(...) if bad>) is quite
+handy for exiting early upon failure.
 
 =item REPL::goto_page ($page_number)
 
@@ -1345,10 +1456,10 @@ To get PDL debugging statements, type the following in the evaluation line:
 
 =head1 Other keyboard shortcuts
 
- CTRL-n  create a new file
- CTRL-w  close the currently open file or tab
+ CTRL-n  create a new multiline buffer
+ CTRL-w  close the currently open tab
  CTRL-o  open a file
- CTRL-s  Save a file
+ CTRL-s  Save a multiline buffer to a file
  ALT-2 through ALT-9 (doesn't work on Mac Laptops)
          switch to tab 2 through 9
 

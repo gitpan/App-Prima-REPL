@@ -4,9 +4,9 @@ author:
   - unknown
 build_requires: {}
 configure_requires:
-  Module::Build: 0.38
+  Module::Build: 0.28
 dynamic_config: 1
-generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.112150'
+generated_by: 'Module::Build version 0.3901, CPAN::Meta::Converter version 2.120630'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -15,7 +15,7 @@ name: App-Prima-REPL
 provides:
   App::Prima::REPL:
     file: lib/App/Prima/REPL.pm
-    version: 0.02
+    version: 0.03
   PrimaX::InputHistory:
     file: lib/PrimaX/InputHistory.pm
     version: 0
@@ -28,8 +28,13 @@ provides:
   ih:
     file: lib/PrimaX/InputHistory.pm
     version: 0
+recommends:
+  PDL: 0
+  PDL::Graphics::Prima: 0
 requires:
   Prima: 1.33
 resources:
+  bugtracker: http://github.com/run4flat/App-Prima-REPL/issues
   license: http://dev.perl.org/licenses/
-version: 0.02
+  repository: http://github.com/run4flat/App-Prima-REPL
+version: 0.03

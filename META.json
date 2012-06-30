@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.112150",
+   "generated_by" : "Module::Build version 0.3901, CPAN::Meta::Converter version 2.120630",
    "license" : [
       "perl_5"
    ],
@@ -16,10 +16,14 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Module::Build" : "0.38"
+            "Module::Build" : "0.28"
          }
       },
       "runtime" : {
+         "recommends" : {
+            "PDL" : "0",
+            "PDL::Graphics::Prima" : "0"
+         },
          "requires" : {
             "Prima" : "1.33"
          }
@@ -28,7 +32,7 @@
    "provides" : {
       "App::Prima::REPL" : {
          "file" : "lib/App/Prima/REPL.pm",
-         "version" : "0.02"
+         "version" : "0.03"
       },
       "PrimaX::InputHistory" : {
          "file" : "lib/PrimaX/InputHistory.pm",
@@ -49,9 +53,15 @@
    },
    "release_status" : "stable",
    "resources" : {
+      "bugtracker" : {
+         "web" : "http://github.com/run4flat/App-Prima-REPL/issues"
+      },
       "license" : [
          "http://dev.perl.org/licenses/"
-      ]
+      ],
+      "repository" : {
+         "url" : "http://github.com/run4flat/App-Prima-REPL"
+      }
    },
-   "version" : "0.02"
+   "version" : "0.03"
 }
